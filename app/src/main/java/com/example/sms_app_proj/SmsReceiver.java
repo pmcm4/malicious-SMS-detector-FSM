@@ -18,11 +18,11 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 
 public class SmsReceiver extends BroadcastReceiver {
 
-
-    private final String SERVER = "http://atifnaseem22.000webhostapp.com/save_sms0.php";
 
     private HashMap<String, State> transitions;
     private State currentState;
@@ -32,8 +32,9 @@ public class SmsReceiver extends BroadcastReceiver {
 
     // Define the initial and final states for the FSM
     enum State {
-        NOT_SPAM, SPAM
+        BENIGN, DEFACEMENT, PHISHING, MALWARE
     }
+
 
     class FSM {
         private State currentState;
@@ -42,7 +43,7 @@ public class SmsReceiver extends BroadcastReceiver {
         public FSM() {
 
             // Set the initial state
-            currentState = State.NOT_SPAM;
+            currentState = State.BENIGN;
             // Initialize the transitions map
             transitions = new HashMap<>();
         }
@@ -51,6 +52,8 @@ public class SmsReceiver extends BroadcastReceiver {
 
             transitions.put(feature, nextState);
         }
+
+
 
         public State process(String msg) {
 
@@ -61,22 +64,80 @@ public class SmsReceiver extends BroadcastReceiver {
                 if (transitions.containsKey(feature)) {
                     currentState = transitions.get(feature);
                     // If the final state is "spam", return it
-                    if (currentState == State.SPAM) {
+                    if (currentState == State.DEFACEMENT) {
+                        return currentState;
+                    }else if (currentState == State.PHISHING){
+                        return currentState;
+                    }else if (currentState == State.MALWARE){
+                        return currentState;
+                    }else if (currentState == State.MALWARE){
+                        return currentState;
+                    }else if (currentState == State.MALWARE){
+                        return currentState;
+                    }else if (currentState == State.MALWARE){
+                        return currentState;
+                    }else if (currentState == State.MALWARE){
+                        return currentState;
+                    }else if (currentState == State.MALWARE){
                         return currentState;
                     }
                 }
             }
+            if (msg.startsWith("http://") && msg.contains(".exe") || msg.startsWith("http://www.") && msg.contains(".exe") || msg.startsWith("www") && msg.contains(".exe")) {
+                return State.MALWARE;
+            }
+            if (msg.startsWith("http://") && msg.contains("paypal") || msg.startsWith("http://www.") && msg.contains("paypal") || msg.startsWith("www") && msg.contains("paypal")) {
+                return State.MALWARE;
+            }
+
+            // Check similarity with URLs in the dataset
+            int threshold = (int) (0.9 * Math.min(msg.length(), 20));
+            for (Map.Entry<String, String> entry : dataset.entrySet()) {
+                String url = entry.getKey();
+                int distance = levenshteinDistance(msg, url);
+                if (distance <= threshold) {
+                    currentState = State.valueOf(entry.getValue().toUpperCase());
+                    return currentState;
+                }
+            }
             // If no transitions were triggered, return the current state
             return currentState;
-
         }
+
+
+    }
+
+    public int levenshteinDistance(String s, String t) {
+        int m = s.length();
+        int n = t.length();
+        int[][] d = new int[m + 1][n + 1];
+        for (int i = 0; i <= m; i++) {
+            d[i][0] = i;
+        }
+        for (int j = 0; j <= n; j++) {
+            d[0][j] = j;
+        }
+        for (int j = 1; j <= n; j++) {
+            for (int i = 1; i <= m; i++) {
+                if (s.charAt(i - 1) == t.charAt(j - 1)) {
+                    d[i][j] = d[i - 1][j - 1];
+                } else {
+                    d[i][j] = 1 + Math.min(d[i - 1][j], Math.min(d[i][j - 1], d[i - 1][j - 1]));
+                }
+            }
+        }
+        return d[m][n];
     }
 
     private String[] extractFeatures(String msg) {
         List<String> features = new ArrayList<>();
         String[] words = msg.split(" ");
         for (String word : words) {
-            if (dataset.containsKey(word.toLowerCase()) && dataset.get(word.toLowerCase()).equals("spam")) {
+            if (dataset.containsKey(word.toLowerCase()) && dataset.get(word.toLowerCase()).equals("defacement")) {
+                features.add(word.toLowerCase());
+            } else if (dataset.containsKey(word.toLowerCase()) && dataset.get(word.toLowerCase()).equals("phishing")) {
+                features.add(word.toLowerCase());
+            }else if (dataset.containsKey(word.toLowerCase()) && dataset.get(word.toLowerCase()).equals("malware")) {
                 features.add(word.toLowerCase());
             }
         }
@@ -91,11 +152,17 @@ public class SmsReceiver extends BroadcastReceiver {
         BufferedReader br = new BufferedReader(new InputStreamReader(is));
         String line;
         try {
+            // Set the batch size
+            int batchSize = 100;
+            // Initialize the batch
+            List<SMS> batch = new ArrayList<>();
+            int lineCount = 0;
             while ((line = br.readLine()) != null) {
+                lineCount++;
                 // Use new line as separator
                 String[] sms = line.split(",", 2);
                 SMS smsObject = new SMS(sms[1], sms[0]);
-                smsList.add(smsObject);
+                batch.add(smsObject);
                 // add message to dataset
                 String[] words = sms[1].split(" ");
                 for (String word : words) {
@@ -103,6 +170,15 @@ public class SmsReceiver extends BroadcastReceiver {
                         dataset.put(word.toLowerCase(), sms[0]);
                     }
                 }
+                // If the batch size is reached, process the batch
+                if (lineCount % batchSize == 0) {
+                    smsList.addAll(batch);
+                    batch.clear();
+                }
+            }
+            // Add any remaining data in the batch to the smsList
+            if (batch.size() > 0) {
+                smsList.addAll(batch);
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -118,18 +194,26 @@ public class SmsReceiver extends BroadcastReceiver {
         return smsList;
     }
 
-
-
     public class SMS {
         private String message;
         private String label;
-        private boolean isSpam;
+        private boolean isDefacement;
+        private boolean isPhishing;
+        private boolean isMalware;
         public SMS(String message, String label) {
             this.message = message;
-            this.isSpam = label.equals("spam");
+            this.isDefacement = label.equals("defacement");
+            this.isPhishing = label.equals("phishing");
+            this.isMalware = label.equals("malware");
         }
-        public boolean isSpam() {
-            return isSpam;
+        public boolean isDefacement() {
+            return isDefacement;
+        }
+        public boolean isPhishing() {
+            return isPhishing;
+        }
+        public boolean isMalware() {
+            return isMalware;
         }
 
         public String getMessage() {
@@ -156,29 +240,45 @@ public class SmsReceiver extends BroadcastReceiver {
 
         // Initialize the transitions map and set the initial state to "not spam"
         transitions = new HashMap<>();
-        currentState = State.NOT_SPAM;
+        currentState = State.BENIGN;
 
         // Iterate through the dataset and train the FSM
         for (SMS sms : dataset) {
             String msg = sms.getMessage();
-            boolean isSpam = sms.isSpam();
+            boolean isDefacement = sms.isDefacement();
+            boolean isPhishing = sms.isPhishing();
+            boolean isMalware = sms.isMalware();
 
             // Extract the features from the SMS message (e.g. keywords, phrases, etc.)
             List<String> features = Arrays.asList(extractFeatures(msg));
 
             // For each feature, check if it triggers a transition to the "spam" state
             for (String feature : features) {
-                if (isSpamFeature(feature)) {
-                    State nextState = State.SPAM;
+                if (isDefacementFeature(feature)) {
+                    State nextState = State.DEFACEMENT;
+                    transitions.put(feature, nextState);
+                } else if (isPhishingFeature(feature)) {
+                    State nextState = State.PHISHING;
+                    transitions.put(feature, nextState);
+                }   else if (isMalwareFeature(feature)) {
+                    State nextState = State.MALWARE;
                     transitions.put(feature, nextState);
                 }
             }
         }
     }
 
-    private boolean isSpamFeature(String feature) {
-        return dataset.get(feature).equals("spam");
+
+    private boolean isDefacementFeature(String feature) {
+        return dataset.get(feature).equals("defacement");
     }
+    private boolean isPhishingFeature(String feature) {
+        return dataset.get(feature).equals("phishing");
+    }
+    private boolean isMalwareFeature(String feature) {
+        return dataset.get(feature).equals("malware");
+    }
+
 
 
     @Override
@@ -200,22 +300,31 @@ public class SmsReceiver extends BroadcastReceiver {
                     for (SMS smsObject : smsList) {
                         String[] features = extractFeatures(smsObject.getMessage());
                         for (String feature : features) {
-                            if (isSpamFeature(feature)) {
-                                fsm.addTransition(feature, State.SPAM);
+                            if (isDefacementFeature(feature)) {
+                                fsm.addTransition(feature, State.DEFACEMENT);
+                            } else if (isPhishingFeature(feature)) {
+                                fsm.addTransition(feature, State.PHISHING);
+                            } else if (isMalwareFeature(feature)) {
+                                fsm.addTransition(feature, State.MALWARE);
                             }
                         }
                     }
 
                     // Classify the SMS message as spam or not
                     State finalState = fsm.process(msg);
-                    if (finalState == State.SPAM) {
-                        Toast.makeText(context, "From: " + phone + " is SPAM", Toast.LENGTH_SHORT).show();
-                    } else {
-                        Toast.makeText(context, "From: " + phone + " is NOT SPAM", Toast.LENGTH_SHORT).show();
+                    if (finalState == State.DEFACEMENT) {
+                        Toast.makeText(context, "From: " + phone + " CONTAINS DEFACEMENT LINKS", Toast.LENGTH_SHORT).show();
+                    } else if(finalState == State.PHISHING){
+                        Toast.makeText(context, "From: " + phone + " CONTAINS PHISHING LINKS", Toast.LENGTH_SHORT).show();
+                    }else if(finalState == State.MALWARE){
+                        Toast.makeText(context, "From: " + phone + " CONTAINS MALWARE LINKS", Toast.LENGTH_SHORT).show();
+                    } else{
+                        Toast.makeText(context, "From: " + phone + " IS BENIGN", Toast.LENGTH_SHORT).show();
                     }
                 }
             }
         }catch (Exception e){
+            e.printStackTrace();
             Log.e("Error", "Failed to read SMS!");
         }
     }
