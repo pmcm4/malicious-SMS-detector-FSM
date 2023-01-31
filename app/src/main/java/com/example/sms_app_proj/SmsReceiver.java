@@ -70,16 +70,6 @@ public class SmsReceiver extends BroadcastReceiver {
                         return currentState;
                     }else if (currentState == State.MALWARE){
                         return currentState;
-                    }else if (currentState == State.MALWARE){
-                        return currentState;
-                    }else if (currentState == State.MALWARE){
-                        return currentState;
-                    }else if (currentState == State.MALWARE){
-                        return currentState;
-                    }else if (currentState == State.MALWARE){
-                        return currentState;
-                    }else if (currentState == State.MALWARE){
-                        return currentState;
                     }
                 }
             }
