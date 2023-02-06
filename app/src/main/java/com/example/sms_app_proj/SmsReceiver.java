@@ -7,7 +7,8 @@ import android.os.Bundle;
 import android.telephony.SmsMessage;
 import android.util.Log;
 import android.widget.Toast;
-
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.io.BufferedReader;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -25,7 +26,6 @@ public class SmsReceiver extends BroadcastReceiver {
 
 
     private HashMap<String, State> transitions;
-    private State currentState;
     private Map<String, String> dataset;
     private List<SMS> smsList = new ArrayList<>();
     private FSM fsm;
@@ -35,65 +35,56 @@ public class SmsReceiver extends BroadcastReceiver {
         BENIGN, DEFACEMENT, PHISHING, MALWARE
     }
 
+    private State currentState = State.BENIGN;
 
     class FSM {
-        private State currentState;
-        private Map<String, State> transitions;
 
-        public FSM() {
-
-            // Set the initial state
-            currentState = State.BENIGN;
-            // Initialize the transitions map
-            transitions = new HashMap<>();
-        }
-
-        public void addTransition(String feature, State nextState) {
-
-            transitions.put(feature, nextState);
-        }
 
 
 
         public State process(String msg) {
+            // Use a pattern to find all URLs in the message
+            Pattern urlPattern = Pattern.compile("(http|https)://[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&amp;:/~\\+#]*[\\w\\-\\@?^=%&amp;/~\\+#])?");
+            Matcher matcher = urlPattern.matcher(msg);
 
-            // Extract features from the SMS message
-            String[] features = extractFeatures(msg);
-            // Iterate through each feature and check if it triggers a transition
-            for (String feature : features) {
-                if (transitions.containsKey(feature)) {
-                    currentState = transitions.get(feature);
-                    // If the final state is "spam", return it
-                    if (currentState == State.DEFACEMENT) {
-                        return currentState;
-                    }else if (currentState == State.PHISHING){
-                        return currentState;
-                    }else if (currentState == State.MALWARE){
-                        return currentState;
+            // Check each URL
+            while (matcher.find()) {
+                // Extract the URL from the match
+                String url = matcher.group();
+
+                // Check similarity with URLs in the dataset
+                int threshold = (int) (0.9 * Math.min(url.length(), 20));
+                for (Map.Entry<String, String> entry : dataset.entrySet()) {
+                    String datasetUrl = entry.getKey();
+                    int distance = levenshteinDistance(url, datasetUrl);
+                    if (distance <= threshold) {
+                        // Determine the next state based on the current state
+                        State nextState = State.valueOf(entry.getValue().toUpperCase());
+                        switch (currentState) {
+                            case BENIGN:
+                                currentState = nextState;
+                                break;
+                            case DEFACEMENT:
+                                if (nextState == State.PHISHING || nextState == State.MALWARE) {
+                                    currentState = nextState;
+                                }
+                                break;
+                            case PHISHING:
+                                System.out.println("phish");
+                                if (nextState == State.MALWARE) {
+                                    currentState = nextState;
+                                }
+                                break;
+                            case MALWARE:
+                                currentState = State.MALWARE;
+                                break;
+                        }
+                        break;
                     }
                 }
             }
-            if (msg.startsWith("http://") && msg.contains(".exe") || msg.startsWith("http://www.") && msg.contains(".exe") || msg.startsWith("www") && msg.contains(".exe")) {
-                return State.MALWARE;
-            }
-            if (msg.startsWith("http://") && msg.contains("paypal") || msg.startsWith("http://www.") && msg.contains("paypal") || msg.startsWith("www") && msg.contains("paypal")) {
-                return State.MALWARE;
-            }
-
-            // Check similarity with URLs in the dataset
-            int threshold = (int) (0.9 * Math.min(msg.length(), 20));
-            for (Map.Entry<String, String> entry : dataset.entrySet()) {
-                String url = entry.getKey();
-                int distance = levenshteinDistance(msg, url);
-                if (distance <= threshold) {
-                    currentState = State.valueOf(entry.getValue().toUpperCase());
-                    return currentState;
-                }
-            }
-            // If no transitions were triggered, return the current state
             return currentState;
         }
-
 
     }
 
@@ -127,7 +118,7 @@ public class SmsReceiver extends BroadcastReceiver {
                 features.add(word.toLowerCase());
             } else if (dataset.containsKey(word.toLowerCase()) && dataset.get(word.toLowerCase()).equals("phishing")) {
                 features.add(word.toLowerCase());
-            }else if (dataset.containsKey(word.toLowerCase()) && dataset.get(word.toLowerCase()).equals("malware")) {
+            } else if (dataset.containsKey(word.toLowerCase()) && dataset.get(word.toLowerCase()).equals("malware")) {
                 features.add(word.toLowerCase());
             }
         }
@@ -223,12 +214,12 @@ public class SmsReceiver extends BroadcastReceiver {
         }
     }
 
-    private void trainFSM(String datasetPath, Context context) throws IOException {
+    /* private void trainFSM(String datasetPath, Context context) throws IOException {
 
         // Read the dataset from the CSV file
         List<SMS> dataset = readDatasetFromCSV(context, datasetPath);
 
-        // Initialize the transitions map and set the initial state to "not spam"
+        // Initialize the transitions map and set the initial state to "benign"
         transitions = new HashMap<>();
         currentState = State.BENIGN;
 
@@ -256,10 +247,10 @@ public class SmsReceiver extends BroadcastReceiver {
                 }
             }
         }
-    }
+    }*/
 
 
-    private boolean isDefacementFeature(String feature) {
+    /* private boolean isDefacementFeature(String feature) {
         return dataset.get(feature).equals("defacement");
     }
     private boolean isPhishingFeature(String feature) {
@@ -267,7 +258,7 @@ public class SmsReceiver extends BroadcastReceiver {
     }
     private boolean isMalwareFeature(String feature) {
         return dataset.get(feature).equals("malware");
-    }
+    }*/
 
 
 
@@ -287,7 +278,7 @@ public class SmsReceiver extends BroadcastReceiver {
                     smsList = readDatasetFromCSV(context, "spam.csv");
 
                     FSM fsm = new FSM();
-                    for (SMS smsObject : smsList) {
+                    /*for (SMS smsObject : smsList) {
                         String[] features = extractFeatures(smsObject.getMessage());
                         for (String feature : features) {
                             if (isDefacementFeature(feature)) {
@@ -298,8 +289,7 @@ public class SmsReceiver extends BroadcastReceiver {
                                 fsm.addTransition(feature, State.MALWARE);
                             }
                         }
-                    }
-
+                    }*/
                     // Classify the SMS message as spam or not
                     State finalState = fsm.process(msg);
                     if (finalState == State.DEFACEMENT) {
