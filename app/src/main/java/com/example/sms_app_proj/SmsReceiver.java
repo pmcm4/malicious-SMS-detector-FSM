@@ -32,19 +32,16 @@ public class SmsReceiver extends BroadcastReceiver {
 
     // Define the initial and final states for the FSM
     enum State {
-        BENIGN, DEFACEMENT, PHISHING, MALWARE
+        BENIGN, DEFACEMENT, PHISHING, MALWARE, DP, DM, PM, DPM
     }
 
     private State currentState = State.BENIGN;
 
     class FSM {
 
-
-
-
         public State process(String msg) {
             // Use a pattern to find all URLs in the message
-            Pattern urlPattern = Pattern.compile("(http|https)://[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&amp;:/~\\+#]*[\\w\\-\\@?^=%&amp;/~\\+#])?");
+            Pattern urlPattern = Pattern.compile("(http|https)://[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&amp;:/~\\+#]*[\\w\\-\\@?^=%&amp;/~\\+#])?|(www.)|([a-zA-Z]+\\.com)|([a-zA-Z]+\\.net)|([a-zA-Z]+\\.tv)|([a-zA-Z]+\\.br)|([a-zA-Z]+\\.edu)|([a-zA-Z]+\\.gov)|([a-zA-Z]+\\.org)|([a-zA-Z]+\\.mil)|([a-zA-Z]+\\.ly)|([a-zA-Z]+\\.au)|([a-zA-Z]+\\.in)|([a-zA-Z]+\\.it)|([a-zA-Z]+\\.ca)|([a-zA-Z]+\\.mx)|([a-zA-Z]+\\.fr)|([a-zA-Z]+\\.mx)|([a-zA-Z]+\\.fr)|([a-zA-Z]+\\.tw)|([a-zA-Z]+\\.il)|([a-zA-Z]+\\.uk)|([a-zA-Z]+\\.ph)|([a-zA-Z]+\\.li)");
             Matcher matcher = urlPattern.matcher(msg);
 
             // Check each URL
@@ -60,32 +57,70 @@ public class SmsReceiver extends BroadcastReceiver {
                     if (distance <= threshold) {
                         // Determine the next state based on the current state
                         State nextState = State.valueOf(entry.getValue().toUpperCase());
+
                         switch (currentState) {
                             case BENIGN:
                                 currentState = nextState;
                                 break;
                             case DEFACEMENT:
-                                if (nextState == State.PHISHING || nextState == State.MALWARE) {
-                                    currentState = nextState;
+                                if (nextState == State.PHISHING) {
+                                    currentState = State.DP;
+                                } else if (nextState == State.MALWARE) {
+                                    currentState = State.DM;
+                                } else {
+                                    currentState = State.DEFACEMENT;
                                 }
                                 break;
                             case PHISHING:
-                                System.out.println("phish");
-                                if (nextState == State.MALWARE) {
-                                    currentState = nextState;
+                                if (nextState == State.DEFACEMENT) {
+                                    currentState = State.DP;
+                                } else if (nextState == State.MALWARE) {
+                                    currentState = State.PM;
+                                } else {
+                                    currentState = State.PHISHING;
                                 }
                                 break;
                             case MALWARE:
-                                currentState = State.MALWARE;
+                                if (nextState == State.DEFACEMENT) {
+                                    currentState = State.DM;
+                                } else if (nextState == State.PHISHING) {
+                                    currentState = State.PM;
+                                } else {
+                                    currentState = State.MALWARE;
+                                }
+                                break;
+                            case DP:
+                                if (nextState == State.MALWARE) {
+                                    currentState = State.DPM;
+                                } else {
+                                    currentState = State.DP;
+                                }
+                                break;
+                            case DM:
+                                if (nextState == State.PHISHING) {
+                                    currentState = State.DPM;
+                                } else {
+                                    currentState = State.DM;
+                                }
+                                break;
+                            case PM:
+                                if (nextState == State.DEFACEMENT) {
+                                    currentState = State.DPM;
+                                } else {
+                                    currentState = nextState;
+                                }
+                                break;
+                            case DPM:
+                                currentState = State.DPM;
                                 break;
                         }
                         break;
                     }
                 }
             }
+            System.out.println(currentState);
             return currentState;
         }
-
     }
 
     public int levenshteinDistance(String s, String t) {
@@ -298,8 +333,16 @@ public class SmsReceiver extends BroadcastReceiver {
                         Toast.makeText(context, "From: " + phone + " CONTAINS PHISHING LINKS", Toast.LENGTH_SHORT).show();
                     }else if(finalState == State.MALWARE){
                         Toast.makeText(context, "From: " + phone + " CONTAINS MALWARE LINKS", Toast.LENGTH_SHORT).show();
-                    } else{
-                        Toast.makeText(context, "From: " + phone + " IS BENIGN", Toast.LENGTH_SHORT).show();
+                    } else if(finalState == State.DP){
+                        Toast.makeText(context, "From: " + phone + " CONTAINS DEFACEMENT & PHISHING LINKS", Toast.LENGTH_SHORT).show();
+                    } else if(finalState == State.DM){
+                        Toast.makeText(context, "From: " + phone + " CONTAINS DEFACEMENT & MALWARE LINKS", Toast.LENGTH_SHORT).show();
+                    } else if(finalState == State.PM){
+                        Toast.makeText(context, "From: " + phone + " CONTAINS PHISHING & MALWARE LINKS", Toast.LENGTH_SHORT).show();
+                    }else if(finalState == State.DPM){
+                        Toast.makeText(context, "From: " + phone + " CONTAINS DEFACEMENT, PHISHING, AND MALWARE LINKS", Toast.LENGTH_SHORT).show();
+                    } else if(finalState == State.BENIGN){
+                        Toast.makeText(context, "From: " + phone + " BENIGN", Toast.LENGTH_SHORT).show();
                     }
                 }
             }
