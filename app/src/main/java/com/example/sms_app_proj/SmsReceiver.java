@@ -40,27 +40,58 @@ public class SmsReceiver extends BroadcastReceiver {
     class FSM {
 
         public State process(String msg) {
+
+            List<String> urls = new ArrayList<>();
+
+
             // Use a pattern to find all URLs in the message
-            Pattern urlPattern = Pattern.compile("(http|https)://[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&amp;:/~\\+#]*[\\w\\-\\@?^=%&amp;/~\\+#])?|(www.)|([a-zA-Z]+\\.com)|([a-zA-Z]+\\.net)|([a-zA-Z]+\\.tv)|([a-zA-Z]+\\.br)|([a-zA-Z]+\\.edu)|([a-zA-Z]+\\.gov)|([a-zA-Z]+\\.org)|([a-zA-Z]+\\.mil)|([a-zA-Z]+\\.ly)|([a-zA-Z]+\\.au)|([a-zA-Z]+\\.in)|([a-zA-Z]+\\.it)|([a-zA-Z]+\\.ca)|([a-zA-Z]+\\.mx)|([a-zA-Z]+\\.fr)|([a-zA-Z]+\\.mx)|([a-zA-Z]+\\.fr)|([a-zA-Z]+\\.tw)|([a-zA-Z]+\\.il)|([a-zA-Z]+\\.uk)|([a-zA-Z]+\\.ph)|([a-zA-Z]+\\.li)");
+            Pattern urlPattern = Pattern.compile("(http|https)://[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&:/~\\+#]*[\\w\\-\\@?^=%&/~\\+#])|(www\\.[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&:/~\\+#]*[\\w\\-\\@?^=%&/~\\+#]))");
+
+
             Matcher matcher = urlPattern.matcher(msg);
 
-            // Check each URL
-            while (matcher.find()) {
-                // Extract the URL from the match
-                String url = matcher.group();
 
+
+            // Check each URL
+
+            while (matcher.find()) {
+
+                urls.add(matcher.group(0));
+
+            }
+
+            // Check each URL
+            for (String url : urls){
+
+                // Extract the URL from the match
+                System.out.println(urls);
                 // Check similarity with URLs in the dataset
-                int threshold = (int) (0.9 * Math.min(url.length(), 20));
+                int threshold = (int) (0.95 * Math.min(url.length(), 20));
+                System.out.println(threshold);
                 for (Map.Entry<String, String> entry : dataset.entrySet()) {
                     String datasetUrl = entry.getKey();
                     int distance = levenshteinDistance(url, datasetUrl);
-                    if (distance <= threshold) {
+
+                    if (distance <= threshold || distance == threshold) {
+                        System.out.println("dataset url: " + datasetUrl);
+                        System.out.println("distance: " + distance);
+                        System.out.println("threshold: " + threshold);
                         // Determine the next state based on the current state
                         State nextState = State.valueOf(entry.getValue().toUpperCase());
 
+                        System.out.println("current state: " + currentState);
+
                         switch (currentState) {
                             case BENIGN:
-                                currentState = nextState;
+                                if (nextState == State.PHISHING) {
+                                    currentState = State.PHISHING;
+                                } else if (nextState == State.MALWARE) {
+                                    currentState = State.MALWARE;
+                                } else if (nextState == State.DEFACEMENT) {
+                                    currentState = State.DEFACEMENT;
+                                }else{
+                                    currentState = State.BENIGN;
+                                }
                                 break;
                             case DEFACEMENT:
                                 if (nextState == State.PHISHING) {
@@ -84,6 +115,7 @@ public class SmsReceiver extends BroadcastReceiver {
                                 if (nextState == State.DEFACEMENT) {
                                     currentState = State.DM;
                                 } else if (nextState == State.PHISHING) {
+
                                     currentState = State.PM;
                                 } else {
                                     currentState = State.MALWARE;
@@ -93,6 +125,7 @@ public class SmsReceiver extends BroadcastReceiver {
                                 if (nextState == State.MALWARE) {
                                     currentState = State.DPM;
                                 } else {
+                                    System.out.println("tite");
                                     currentState = State.DP;
                                 }
                                 break;
@@ -111,14 +144,15 @@ public class SmsReceiver extends BroadcastReceiver {
                                 }
                                 break;
                             case DPM:
-                                currentState = State.DPM;
+                                    currentState = State.DPM;
                                 break;
                         }
                         break;
                     }
                 }
             }
-            System.out.println(currentState);
+
+            System.out.println("current state: " + currentState);
             return currentState;
         }
     }
