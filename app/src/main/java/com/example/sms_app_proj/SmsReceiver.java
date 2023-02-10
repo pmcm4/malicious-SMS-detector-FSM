@@ -37,50 +37,31 @@ public class SmsReceiver extends BroadcastReceiver {
 
     private State currentState = State.BENIGN;
 
-    class FSM {
-
+    public class FSM {
         public State process(String msg) {
-
             List<String> urls = new ArrayList<>();
 
-
-            // Use a pattern to find all URLs in the message
             Pattern urlPattern = Pattern.compile("(http|https)://[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&:/~\\+#]*[\\w\\-\\@?^=%&/~\\+#])|(www\\.[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&:/~\\+#]*[\\w\\-\\@?^=%&/~\\+#]))");
-
-
             Matcher matcher = urlPattern.matcher(msg);
 
-
-
-            // Check each URL
-
             while (matcher.find()) {
-
-                urls.add(matcher.group(0));
-
+                urls.add(matcher.group());
             }
 
-            // Check each URL
-            for (String url : urls){
+            for (String url : urls) {
+                double threshold = 0.9;
 
-                // Extract the URL from the match
-                System.out.println(urls);
-                // Check similarity with URLs in the dataset
-                int threshold = (int) (0.95 * Math.min(url.length(), 20));
-                System.out.println(threshold);
                 for (Map.Entry<String, String> entry : dataset.entrySet()) {
                     String datasetUrl = entry.getKey();
-                    int distance = levenshteinDistance(url, datasetUrl);
+                    double distance = jaroWinklerDistance(url, datasetUrl);
 
-                    if (distance <= threshold || distance == threshold) {
-                        System.out.println("dataset url: " + datasetUrl);
-                        System.out.println("distance: " + distance);
-                        System.out.println("threshold: " + threshold);
-                        // Determine the next state based on the current state
+                    if (distance >= threshold) {
                         State nextState = State.valueOf(entry.getValue().toUpperCase());
 
-                        System.out.println("current state: " + currentState);
-
+                        System.out.println("url: " + url);
+                        System.out.println("dataset url: "+datasetUrl);
+                        System.out.println("distance: "+distance);
+                        System.out.println("threshold: "+threshold);
                         switch (currentState) {
                             case BENIGN:
                                 if (nextState == State.PHISHING) {
@@ -89,7 +70,7 @@ public class SmsReceiver extends BroadcastReceiver {
                                     currentState = State.MALWARE;
                                 } else if (nextState == State.DEFACEMENT) {
                                     currentState = State.DEFACEMENT;
-                                }else{
+                                } else {
                                     currentState = State.BENIGN;
                                 }
                                 break;
@@ -115,7 +96,6 @@ public class SmsReceiver extends BroadcastReceiver {
                                 if (nextState == State.DEFACEMENT) {
                                     currentState = State.DM;
                                 } else if (nextState == State.PHISHING) {
-
                                     currentState = State.PM;
                                 } else {
                                     currentState = State.MALWARE;
@@ -125,8 +105,13 @@ public class SmsReceiver extends BroadcastReceiver {
                                 if (nextState == State.MALWARE) {
                                     currentState = State.DPM;
                                 } else {
-                                    System.out.println("tite");
                                     currentState = State.DP;
+                                }break;
+                            case PM:
+                                if (nextState == State.DEFACEMENT) {
+                                    currentState = State.DPM;
+                                } else {
+                                    currentState = State.PM;
                                 }
                                 break;
                             case DM:
@@ -136,26 +121,88 @@ public class SmsReceiver extends BroadcastReceiver {
                                     currentState = State.DM;
                                 }
                                 break;
-                            case PM:
-                                if (nextState == State.DEFACEMENT) {
-                                    currentState = State.DPM;
-                                } else {
-                                    currentState = nextState;
-                                }
-                                break;
                             case DPM:
-                                    currentState = State.DPM;
+                                currentState = State.DPM;
+                                break;
+                            default:
                                 break;
                         }
-                        break;
                     }
                 }
             }
-
-            System.out.println("current state: " + currentState);
             return currentState;
         }
+        }
+    private double jaroWinklerDistance(String a, String b) {
+        int[] mtp = matches(a, b);
+        float m = mtp[0];
+        if (m == 0) {
+            return 0f;
+        }
+        float j = ((m / a.length() + m / b.length() + (m - mtp[1]) / m)) / 3;
+        float jw = j < 0.7f ? j : j + Math.min(0.1f, 1f / mtp[3]) * mtp[2] * (1 - j);
+        return jw;
     }
+
+    private int[] matches(String a, String b) {
+        String max, min;
+        if (a.length() > b.length()) {
+            max = a;
+            min = b;
+        } else {
+            max = b;
+            min = a;
+        }
+        int range = Math.max(max.length() / 2 - 1, 0);
+        int[] matchIndexes = new int[min.length()];
+        Arrays.fill(matchIndexes, -1);
+        boolean[] matchFlags = new boolean[max.length()];
+        int matches = 0;
+        for (int mi = 0; mi < min.length(); mi++) {
+            char c1 = min.charAt(mi);
+            for (int xi = Math.max(mi - range, 0), xn = Math.min(mi + range + 1, max.length()); xi < xn; xi++) {
+                if (!matchFlags[xi] && c1 == max.charAt(xi)) {
+                    matchIndexes[mi] = xi;
+                    matchFlags[xi] = true;
+                    matches++;
+                    break;
+                }
+            }
+        }
+        char[] ms1 = new char[matches];
+        char[] ms2 = new char[matches];
+        for (int i = 0, si = 0; i < min.length(); i++) {
+            if (matchIndexes[i] != -1) {
+                ms1[si] = min.charAt(i);
+                si++;
+            }
+        }
+        for (int i = 0, si = 0; i < max.length(); i++) {
+            if (matchFlags[i]) {
+                ms2[si] = max.charAt(i);
+                si++;
+            }
+        }
+        int transpositions = 0;
+        for (int mi = 0; mi < ms1.length; mi++) {
+            if (ms1[mi] != ms2[mi]) {
+                transpositions++;
+            }
+        }
+        int prefix = 0;
+        for (int mi = 0; mi < min.length(); mi++) {
+            if (a.charAt(mi) == b.charAt(mi)) {
+                prefix++;
+            } else {
+                break;
+            }
+        }
+        return new int[]{matches, transpositions / 2, prefix, max.length()};
+    }
+
+
+
+
 
     public int levenshteinDistance(String s, String t) {
         int m = s.length();
