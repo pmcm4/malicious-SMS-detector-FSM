@@ -49,10 +49,11 @@ public class SmsReceiver extends BroadcastReceiver {
                 }
             }
 
+
             for (String url : urls) {
                 double threshold = 0.9;
                 System.out.println(urls);
-                for (Map.Entry<String, String> entry : dataset.entrySet()) {
+                for (Map.Entry<String, String> entry : dataset.entrySet()){
                     String datasetUrl = entry.getKey();
                     double distance = jaroWinklerDistance(url, datasetUrl);
 
@@ -133,6 +134,7 @@ public class SmsReceiver extends BroadcastReceiver {
             return currentState;
         }
     }
+
     private double jaroWinklerDistance(String a, String b) {
         int[] mtp = matches(a, b);
         float m = mtp[0];
@@ -198,32 +200,6 @@ public class SmsReceiver extends BroadcastReceiver {
             }
         }
         return new int[]{matches, transpositions / 2, prefix, max.length()};
-    }
-
-
-
-
-
-    public int levenshteinDistance(String s, String t) {
-        int m = s.length();
-        int n = t.length();
-        int[][] d = new int[m + 1][n + 1];
-        for (int i = 0; i <= m; i++) {
-            d[i][0] = i;
-        }
-        for (int j = 0; j <= n; j++) {
-            d[0][j] = j;
-        }
-        for (int j = 1; j <= n; j++) {
-            for (int i = 1; i <= m; i++) {
-                if (s.charAt(i - 1) == t.charAt(j - 1)) {
-                    d[i][j] = d[i - 1][j - 1];
-                } else {
-                    d[i][j] = 1 + Math.min(d[i - 1][j], Math.min(d[i][j - 1], d[i - 1][j - 1]));
-                }
-            }
-        }
-        return d[m][n];
     }
 
     private String[] extractFeatures(String msg) {
@@ -294,23 +270,8 @@ public class SmsReceiver extends BroadcastReceiver {
     public class SMS {
         private String message;
         private String label;
-        private boolean isDefacement;
-        private boolean isPhishing;
-        private boolean isMalware;
         public SMS(String message, String label) {
             this.message = message;
-            this.isDefacement = label.equals("defacement");
-            this.isPhishing = label.equals("phishing");
-            this.isMalware = label.equals("malware");
-        }
-        public boolean isDefacement() {
-            return isDefacement;
-        }
-        public boolean isPhishing() {
-            return isPhishing;
-        }
-        public boolean isMalware() {
-            return isMalware;
         }
 
         public String getMessage() {

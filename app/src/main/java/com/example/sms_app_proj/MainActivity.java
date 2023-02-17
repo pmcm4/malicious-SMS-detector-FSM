@@ -5,6 +5,9 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import android.provider.BlockedNumberContract;
+import android.provider.BlockedNumberContract.BlockedNumbers;
+
 
 import android.Manifest;
 import android.annotation.SuppressLint;
@@ -19,7 +22,6 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.provider.BlockedNumberContract;
 import android.provider.CallLog;
 import android.provider.Telephony;
 import android.telephony.SmsManager;
@@ -55,7 +57,6 @@ public class MainActivity extends AppCompatActivity {
 
     EditText etPhone, etMsg;
     Button btnSendSMS, btnReadSMS;
-
     ListView lvSMS;
     static ArrayList<String> smsData = new ArrayList<String>();
     ArrayAdapter arrayAdapter;
@@ -268,6 +269,7 @@ public class MainActivity extends AppCompatActivity {
                 mainActivity.arrayAdapter.notifyDataSetChanged();
             }
         }
+
     }
 
 
@@ -368,53 +370,61 @@ public class MainActivity extends AppCompatActivity {
         SMSAdapter() {
             super(MainActivity.this, R.layout.list_item, smsData);
         }
+        private int selectedSmsPosition;
 
+        SMSAdapter(int selectedSmsPosition) {
+            super(MainActivity.this, R.layout.list_item, smsData);
+            this.selectedSmsPosition = selectedSmsPosition;
+        }
         @NonNull
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             if (convertView == null) {
                 convertView = LayoutInflater.from(getContext()).inflate(R.layout.list_item, parent, false);
             }
-
             TextView textView = convertView.findViewById(R.id.text_sms);
             textView.setText(getItem(position));
             String phoneNumber = getNumberFromSms(getItem(position));
-            Button button = convertView.findViewById(R.id.btn_spam);
-            button.setOnClickListener(new View.OnClickListener() {
+            System.out.println("bayag: "+ phoneNumber);
+            Button blockButton = convertView.findViewById(R.id.block_button);
+            blockButton.setOnClickListener(new View.OnClickListener() {
                 @Override
-                public void onClick(View view) {
-                    // do something when button is clicked
-                    blockNumber(phoneNumber);
+                public void onClick(View v) {
+                    addNumberToBlockList(phoneNumber);
                 }
             });
+
             return convertView;
         }
 
-        private void blockNumber(String number) {
-            ContentValues contentValues = new ContentValues();
-            contentValues.put(BlockedNumberContract.BlockedNumbers.COLUMN_ORIGINAL_NUMBER, number);
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
-                Uri uri = getApplicationContext().getContentResolver().insert(BlockedNumberContract.BlockedNumbers.CONTENT_URI, contentValues);
-            }
+
+        private void addNumberToBlockList(String phoneNumber) {
+            // Remove the item from the smsData list
+            smsData.remove(selectedSmsPosition);
+
+            // Add the number to the blocked numbers list
+            ContentValues values = new ContentValues();
+            values.put(BlockedNumberContract.BlockedNumbers.COLUMN_ORIGINAL_NUMBER, phoneNumber);
+            ContentResolver contentResolver = getContentResolver();
+            contentResolver.insert(BlockedNumberContract.BlockedNumbers.CONTENT_URI, values);
+
+            // Notify the adapter that the data set has changed
+            arrayAdapter.notifyDataSetChanged();
         }
 
         @SuppressLint("Range")
         private String getNumberFromSms(String sms) {
-            // Define the columns to retrieve
-            String[] projection = new String[]{Telephony.Sms.ADDRESS};
-            // Define the selection criteria
-            String selection = Telephony.Sms.BODY + " = ?";
-            // Define the selection arguments
-            String[] selectionArgs = {sms};
-            // Get the content resolver
-            ContentResolver contentResolver = getContext().getContentResolver();
-            // Query the SMS content provider
-            Cursor cursor = contentResolver.query(Telephony.Sms.CONTENT_URI, projection, selection, selectionArgs, null);
-            // Extract the phone number from the cursor
             String phoneNumber = null;
-            if (cursor != null && cursor.moveToFirst()) {
-                phoneNumber = cursor.getString(cursor.getColumnIndexOrThrow(Telephony.Sms.ADDRESS));
-                cursor.close();
+            if (sms != null) {
+                int start = sms.indexOf("+");
+                if (start >= 0) {
+                    int end = sms.indexOf(" ", start);
+                    if (end >= start) {
+                        phoneNumber = sms.substring(start, end);
+                    } else {
+                        phoneNumber = sms.substring(start);
+                    }
+                }
             }
             return phoneNumber;
         }

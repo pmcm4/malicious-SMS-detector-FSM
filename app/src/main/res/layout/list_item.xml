@@ -13,7 +13,7 @@
         android:padding="10dp"/>
 
     <Button
-        android:id="@+id/btn_spam"
+        android:id="@+id/block_button"
         android:layout_width="100dp"
         android:layout_height="wrap_content"
         android:textSize="10dp"

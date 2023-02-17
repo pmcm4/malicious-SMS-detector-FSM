@@ -15,6 +15,7 @@
         tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.READ_BLOCKED_NUMBERS"
         tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.BLOCKED_NUMBERS"/>
 
 
     <application
