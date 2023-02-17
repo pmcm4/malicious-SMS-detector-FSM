@@ -41,23 +41,23 @@ public class SmsReceiver extends BroadcastReceiver {
         public State process(String msg) {
             List<String> urls = new ArrayList<>();
 
-            Pattern urlPattern = Pattern.compile("(http|https)://[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&:/~\\+#]*[\\w\\-\\@?^=%&/~\\+#])|(www\\.[\\w\\-_]+(\\.[\\w\\-_]+)+([\\w\\-\\.,@?^=%&:/~\\+#]*[\\w\\-\\@?^=%&/~\\+#]))");
-            Matcher matcher = urlPattern.matcher(msg);
+            String[] words = msg.split("[\\s\\n]+");
 
-            while (matcher.find()) {
-                urls.add(matcher.group());
+            for (String word : words) {
+                if (word.contains("/") || (word.contains(".") && word.lastIndexOf(".") > 0)) {
+                    urls.add(word);
+                }
             }
 
             for (String url : urls) {
                 double threshold = 0.9;
-
+                System.out.println(urls);
                 for (Map.Entry<String, String> entry : dataset.entrySet()) {
                     String datasetUrl = entry.getKey();
                     double distance = jaroWinklerDistance(url, datasetUrl);
 
                     if (distance >= threshold) {
                         State nextState = State.valueOf(entry.getValue().toUpperCase());
-
                         System.out.println("url: " + url);
                         System.out.println("dataset url: "+datasetUrl);
                         System.out.println("distance: "+distance);
@@ -132,7 +132,7 @@ public class SmsReceiver extends BroadcastReceiver {
             }
             return currentState;
         }
-        }
+    }
     private double jaroWinklerDistance(String a, String b) {
         int[] mtp = matches(a, b);
         float m = mtp[0];
