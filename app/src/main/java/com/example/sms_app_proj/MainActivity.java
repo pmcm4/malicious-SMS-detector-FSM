@@ -7,6 +7,8 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import android.provider.BlockedNumberContract;
 import android.provider.BlockedNumberContract.BlockedNumbers;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 
 import android.Manifest;
@@ -416,14 +418,10 @@ public class MainActivity extends AppCompatActivity {
         private String getNumberFromSms(String sms) {
             String phoneNumber = null;
             if (sms != null) {
-                int start = sms.indexOf("+");
-                if (start >= 0) {
-                    int end = sms.indexOf(" ", start);
-                    if (end >= start) {
-                        phoneNumber = sms.substring(start, end);
-                    } else {
-                        phoneNumber = sms.substring(start);
-                    }
+                Pattern pattern = Pattern.compile("\\+?[0-9]{5,13}");
+                Matcher matcher = pattern.matcher(sms);
+                if (matcher.find()) {
+                    phoneNumber = matcher.group();
                 }
             }
             return phoneNumber;

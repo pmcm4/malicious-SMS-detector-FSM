@@ -5,6 +5,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.telephony.SmsMessage;
+import android.os.Build;
+import android.provider.BlockedNumberContract;
+import android.provider.BlockedNumberContract.BlockedNumbers;
+
 import android.util.Log;
 import android.widget.Toast;
 import java.util.regex.Matcher;
@@ -351,6 +355,8 @@ public class SmsReceiver extends BroadcastReceiver {
                     String phone = sms.getDisplayOriginatingAddress();
                     String msg = sms.getDisplayMessageBody();
 
+
+
                     // Train the FSM on the dataset
                     smsList = readDatasetFromCSV(context, "spam.csv");
 
@@ -387,10 +393,12 @@ public class SmsReceiver extends BroadcastReceiver {
                         Toast.makeText(context, "From: " + phone + " BENIGN", Toast.LENGTH_SHORT).show();
                     }
                 }
+
             }
         }catch (Exception e){
             e.printStackTrace();
             Log.e("Error", "Failed to read SMS!");
         }
     }
+
 }
