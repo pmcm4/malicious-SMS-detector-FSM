@@ -387,7 +387,6 @@ public class MainActivity extends AppCompatActivity {
             TextView textView = convertView.findViewById(R.id.text_sms);
             textView.setText(getItem(position));
             String phoneNumber = getNumberFromSms(getItem(position));
-            System.out.println("bayag: "+ phoneNumber);
             Button blockButton = convertView.findViewById(R.id.block_button);
             blockButton.setOnClickListener(new View.OnClickListener() {
                 @Override

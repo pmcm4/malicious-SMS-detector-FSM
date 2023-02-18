@@ -16,7 +16,7 @@
         android:id="@+id/block_button"
         android:layout_width="100dp"
         android:layout_height="wrap_content"
-        android:textSize="10dp"
-        android:text="Mark as spam" />
+        android:text="Blacklist Sender"
+        android:textSize="10dp" />
 
 </LinearLayout>

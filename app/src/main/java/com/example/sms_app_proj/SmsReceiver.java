@@ -53,13 +53,12 @@ public class SmsReceiver extends BroadcastReceiver {
                 }
             }
 
-
             for (String url : urls) {
                 double threshold = 0.9;
                 System.out.println(urls);
                 for (Map.Entry<String, String> entry : dataset.entrySet()){
                     String datasetUrl = entry.getKey();
-                    double distance = jaroWinklerDistance(url, datasetUrl);
+                    double distance = similarityCheck(url, datasetUrl);
 
                     if (distance >= threshold) {
                         State nextState = State.valueOf(entry.getValue().toUpperCase());
@@ -67,6 +66,8 @@ public class SmsReceiver extends BroadcastReceiver {
                         System.out.println("dataset url: "+datasetUrl);
                         System.out.println("distance: "+distance);
                         System.out.println("threshold: "+threshold);
+                        System.out.println("Current State: "+currentState);
+                        System.out.println("Next State: "+nextState);
                         switch (currentState) {
                             case BENIGN:
                                 if (nextState == State.PHISHING) {
@@ -139,7 +140,7 @@ public class SmsReceiver extends BroadcastReceiver {
         }
     }
 
-    private double jaroWinklerDistance(String a, String b) {
+    private double similarityCheck(String a, String b) {
         int[] mtp = matches(a, b);
         float m = mtp[0];
         if (m == 0) {
